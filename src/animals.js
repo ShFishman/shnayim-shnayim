@@ -13,8 +13,8 @@ import { Animal, SPECIES } from './fauna.js';
 import { clamp, lerp, makeRng } from './utils.js';
 import T from './content.js';
 
-export const HERD_LIMIT = 4;      // how many can trail you at once
-export const CALL_RADIUS = 11;    // base shofar reach
+export const HERD_LIMIT = 5;      // how many can trail you at once
+export const CALL_RADIUS = 16;    // base shofar reach
 
 const STATE = { IDLE: 0, FOLLOW: 1, BOARD: 2, DONE: 3, PANIC: 4 };
 
@@ -227,7 +227,7 @@ export class Herd {
       const baseAng = (i / listed.length) * Math.PI * 2 + this.rng.range(-0.3, 0.3);
       for (const sex of ['m', 'f']) {
         const ang = baseAng + this.rng.range(-0.22, 0.22);
-        const r = this.rng.range(20, 46);
+        const r = this.rng.range(17, 39);
         const [x, z] = this._findSpot(ang, r);
         const c = new Critter(key, sex, {
           seed: (i + 1) * 31 + (sex === 'm' ? 3 : 7),

@@ -53,6 +53,11 @@ export class HUD {
       verseEn: $('verse-en'),
       verseRef: $('verse-ref'),
       shofarRing: $('shofar-ring'),
+      caption: $('caption'),
+      skipHint: $('skip-hint'),
+      minimap: $('minimap'),
+      waypoint: $('waypoint'),
+      waypointDist: $('waypoint-dist'),
     };
     this.showEn = false;
     this._toastT = 0;
@@ -175,16 +180,6 @@ export class HUD {
     this.el.shofarRing.classList.toggle('ready', frac >= 1);
   }
 
-  /* ── offscreen marker pointing at the nearest animal ── */
-  setMarker(screen, show, dist = 0) {
-    const m = this.el.marker;
-    m.classList.toggle('in', !!show);
-    if (!show) return;
-    m.style.left = `${screen.x}px`;
-    m.style.top = `${screen.y}px`;
-    m.style.transform = `translate(-50%,-50%) rotate(${screen.angle}rad)`;
-    m.dataset.dist = `${Math.round(dist)}`;
-  }
 
   /* ── verse card, used for the opening and the ending ── */
   async verse(v, dur = 4.2) {
@@ -239,8 +234,47 @@ export class HUD {
 
   setHudVisible(on) { this.el.hud.classList.toggle('in', !!on); }
 
+  /* ── cinematic helpers ── */
+
+  /** Letterbox and hide the chrome while the cold open plays. */
+  setCinema(on) {
+    document.body.classList.toggle('cinema', !!on);
+  }
+
+  /** Centred caption for narration (as opposed to a character speaking). */
+  caption(obj, dur = 3) {
+    bi(this.el.caption, obj);
+    this.el.caption.classList.add('in');
+    this._capT = dur;
+    this._revealWords(this.el.caption);
+  }
+  hideCaption() { this.el.caption.classList.remove('in'); this._capT = 0; }
+
+  showSkipHint(obj) { bi(this.el.skipHint, obj); this.el.skipHint.classList.add('in'); }
+  hideSkipHint() { this.el.skipHint.classList.remove('in'); }
+
+  /* ── waypoint: always-on guidance ──
+   * `kind` is 'animal' or 'ark'. When the target is on screen it sits over it;
+   * when it is off screen the arrow pins to the edge and points the way.
+   */
+  setWaypoint(screen, kind, dist) {
+    const w = this.el.waypoint;
+    if (!screen) { w.classList.remove('in'); return; }
+    w.classList.add('in');
+    w.dataset.kind = kind;
+    w.classList.toggle('edge', !!screen.edge);
+    w.style.left = `${screen.x}px`;
+    w.style.top = `${screen.y}px`;
+    w.style.setProperty('--rot', `${screen.angle || 0}rad`);
+    this.el.waypointDist.textContent = dist != null ? `${Math.round(dist)}m` : '';
+  }
+
   /* ── per-frame ── */
   update(dt) {
+    if (this._capT > 0) {
+      this._capT -= dt;
+      if (this._capT <= 0) this.el.caption.classList.remove('in');
+    }
     if (this._toastT > 0) {
       this._toastT -= dt;
       if (this._toastT <= 0) this.el.toast.classList.remove('in');

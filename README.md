@@ -7,6 +7,9 @@ You are Noah. You have an ark, a ramp, and a shofar. You have to get a male and
 a female of every kind aboard before the water closes over the valley. You can
 also try to talk the neighbours into coming with you. They have opinions.
 
+It opens with a two-minute scene in which God gives Noah the specifications and
+Noah asks reasonable follow-up questions. You can skip it.
+
 **▶ Play: https://shfishman.github.io/shnayim-shnayim/**
 
 Hebrew first, with an English toggle. Runs in any modern browser. No install,
@@ -26,12 +29,18 @@ no build step, no downloads.
 | wheel | zoom |
 | `Esc` | pause |
 
-On a phone you get a thumbstick and two buttons.
+On a phone you get a thumbstick and two buttons. Any click skips the opening.
+
+**Finding your way.** The minimap bottom-left is also a flood map: ground still
+above water is green, drowned ground is blue, so you can see at a glance where
+it is still safe to walk. Pink and blue dots are the animals you still owe. The
+gold arrow points at the nearest one; once you have animals following you it
+turns green and points back at the ramp.
 
 **The goal.** Lead animals to the foot of the ramp and they walk aboard. You
 need *two of each kind, male and female* — the rings under their feet are blue
 for males and pink for females, and the strip along the bottom of the screen
-tracks what you still owe. You can only lead four at a time.
+tracks what you still owe. You can lead five at a time.
 
 **The pressure.** The water rises on a curve, not a line: for the first minute
 almost nothing happens, and then it gets away from you. Animals caught by the
@@ -71,6 +80,8 @@ index.html          import map, all HUD markup
 styles.css
 src/
   main.js           boot, the run of play, the ending
+  opening.js        the two-minute cold open: script and staging together
+  minimap.js        radar, and the flood map
   engine.js         renderer, camera rig, post stack, frame loop
   world.js          terrain, the flood, sky, rain
   ark.js            the ark — hull lofted from elliptical sections

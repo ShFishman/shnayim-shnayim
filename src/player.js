@@ -121,7 +121,7 @@ export class Noah {
     this.pos = new THREE.Vector3(0, 0, 18);
     this.heading = Math.PI;
     this.speed = 0;
-    this.maxSpeed = 9.2;
+    this.maxSpeed = 11.5;
     this.radius = 0.6;
     this._walk = 0;
     this._blow = 0;      // 0..1 shofar raise
@@ -157,14 +157,16 @@ export class Noah {
     const { waterLevel = -999, blocked = null } = opts;
 
     const mag = Math.min(1, Math.hypot(input.x, input.z));
-    const target = mag * this.maxSpeed * (input.run ? 1.0 : 0.62);
+    // walking used to be a crawl; the gap between walk and sprint is now
+    // a flourish rather than the difference between fun and tedious
+    const target = mag * this.maxSpeed * (input.run ? 1.0 : 0.80);
 
     // wading is slow, and that is the whole late-game pressure
     const wade = clamp((waterLevel - (this.pos.y)) / 1.4, 0, 1);
     this.inWater = wade;
-    const slowed = target * lerp(1, 0.34, wade);
+    const slowed = target * lerp(1, 0.46, wade);
 
-    this.speed = lerp(this.speed, slowed, 1 - Math.pow(0.0008, dt));
+    this.speed = lerp(this.speed, slowed, 1 - Math.pow(0.00002, dt));
 
     if (mag > 0.02) {
       const want = Math.atan2(input.x, input.z);
@@ -172,7 +174,7 @@ export class Noah {
       let d = want - this.heading;
       while (d > Math.PI) d -= Math.PI * 2;
       while (d < -Math.PI) d += Math.PI * 2;
-      this.heading += d * (1 - Math.pow(0.0005, dt));
+      this.heading += d * (1 - Math.pow(0.00003, dt));
     }
 
     if (this.speed > 0.01) {

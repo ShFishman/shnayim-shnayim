@@ -388,6 +388,70 @@ export class Audio {
     });
   }
 
+  /**
+   * The voice from the cold open. Wordless: a harmonic stack pushed through
+   * two swept formant bandpasses, which is roughly how a vowel is shaped. Two
+   * vowel paths so successive lines do not sound identical.
+   */
+  voice(variant = 0) {
+    this._defer(() => {
+      const ctx = this.ctx, t = ctx.currentTime;
+      const base = variant ? 58 : 66;                 // very low
+      const F = variant ? [[520, 1180], [430, 900]] : [[700, 1120], [600, 980]];
+
+      const out = ctx.createGain();
+      out.gain.setValueAtTime(0, t);
+      out.gain.linearRampToValueAtTime(0.30, t + 0.55);
+      out.gain.setValueAtTime(0.30, t + 1.5);
+      out.gain.exponentialRampToValueAtTime(0.0001, t + 3.0);
+      out.connect(this.bus);
+
+      // formants
+      const fNodes = F.map(([f0, f1], i) => {
+        const bp = ctx.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.Q.value = 5.5;
+        bp.frequency.setValueAtTime(f0, t);
+        bp.frequency.linearRampToValueAtTime(f1, t + 1.9);
+        const g = ctx.createGain();
+        g.gain.value = i === 0 ? 0.9 : 0.5;
+        bp.connect(g); g.connect(out);
+        return bp;
+      });
+
+      // harmonic stack
+      for (const [mult, amp, det] of [[1, 1.0, 0], [2, 0.6, 3], [3, 0.4, -4], [5, 0.22, 6], [7, 0.12, -7]]) {
+        const o = ctx.createOscillator();
+        o.type = 'sawtooth';
+        o.frequency.value = base * mult;
+        o.detune.value = det;
+        const g = ctx.createGain();
+        g.gain.value = amp * 0.14;
+        o.connect(g);
+        for (const bp of fNodes) g.connect(bp);
+        o.start(t); o.stop(t + 3.2);
+      }
+
+      // a slow tremor so it does not sit perfectly still
+      const lfo = ctx.createOscillator();
+      lfo.frequency.value = 4.6;
+      const lg = ctx.createGain(); lg.gain.value = 0.035;
+      lfo.connect(lg); lg.connect(out.gain);
+      lfo.start(t); lfo.stop(t + 3.2);
+
+      // sub reinforcement you feel rather than hear
+      const sub = ctx.createOscillator();
+      sub.type = 'sine';
+      sub.frequency.value = base * 0.5;
+      const sg = ctx.createGain();
+      sg.gain.setValueAtTime(0, t);
+      sg.gain.linearRampToValueAtTime(0.16, t + 0.5);
+      sg.gain.exponentialRampToValueAtTime(0.0001, t + 2.8);
+      sub.connect(sg); sg.connect(this.bus);
+      sub.start(t); sub.stop(t + 3.0);
+    });
+  }
+
   /** Wing beats, for the dove at the end. */
   wings(beats = 9) {
     this._defer(() => {

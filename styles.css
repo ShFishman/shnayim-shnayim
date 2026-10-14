@@ -217,6 +217,75 @@ body.show-en .dlg-text{direction:ltr}
 .marker.in{opacity:.9}
 .marker svg{width:100%;height:100%;fill:var(--sun);stroke:var(--wood);stroke-width:1.6}
 
+/* ───────── minimap (radar + flood map) ───────── */
+.minimap-wrap{
+  position:absolute;left:14px;bottom:14px;width:clamp(118px,15vw,168px);aspect-ratio:1;
+  filter:drop-shadow(0 5px 0 rgba(0,0,0,.18));
+}
+.minimap{width:100%;height:100%;display:block;border-radius:50%;background:rgba(20,30,24,.5)}
+
+/* ───────── waypoint ─────────
+ * Sits over the target when it is on screen, and pins to the edge pointing
+ * the way when it is not.
+ */
+.waypoint{
+  position:absolute;width:46px;height:46px;margin:-23px 0 0 -23px;
+  display:grid;place-items:center;opacity:0;transition:opacity .3s var(--ease);
+  filter:drop-shadow(0 2px 3px rgba(0,0,0,.35));
+}
+.waypoint.in{opacity:.95}
+.wp-arrow{width:28px;height:28px;transform:rotate(var(--rot,0rad));transition:transform .08s linear}
+.waypoint[data-kind="animal"] .wp-arrow{fill:#f6c445;stroke:#6b3f12;stroke-width:1.5}
+.waypoint[data-kind="ark"]    .wp-arrow{fill:#7fd36a;stroke:#1f5a1b;stroke-width:1.5}
+/* on-screen: a bobbing pin rather than a pointer */
+.waypoint:not(.edge) .wp-arrow{transform:rotate(180deg);animation:wpbob 1.5s var(--ease) infinite}
+@keyframes wpbob{0%,100%{translate:0 -3px}50%{translate:0 4px}}
+.wp-dist{
+  position:absolute;top:30px;font-size:.62rem;font-weight:700;color:#fff6e4;
+  background:rgba(40,28,16,.68);padding:.05em .4em;border-radius:6px;white-space:nowrap;
+}
+.waypoint:not(.edge) .wp-dist{display:none}
+
+/* ───────── cold open: letterbox, caption, skip ───────── */
+.bars{position:fixed;inset:0;z-index:38;pointer-events:none}
+.bar{
+  position:absolute;inset-inline:0;height:0;background:#0b0f14;
+  transition:height .8s var(--ease);
+}
+.bar.top{top:0}
+.bar.bottom{bottom:0}
+body.cinema .bar{height:8.5vh}
+
+.caption{
+  position:fixed;z-index:42;bottom:13vh;inset-inline:0;margin-inline:auto;
+  width:max-content;max-width:min(88vw,680px);text-align:center;
+  font-size:clamp(1rem,2.9vw,1.3rem);line-height:1.9;color:#fff6e4;
+  text-shadow:0 2px 10px rgba(0,0,0,.85),0 0 30px rgba(0,0,0,.6);
+  opacity:0;transition:opacity .4s var(--ease);pointer-events:none;
+}
+.caption.in{opacity:1}
+.caption .he{direction:rtl;display:inline-block}
+.caption .en{direction:ltr}
+.caption .w{display:inline-block;opacity:0;transform:translateY(7px);filter:blur(4px);transition:all .4s var(--ease)}
+.caption .w.on{opacity:1;transform:none;filter:none}
+
+.skip-hint{
+  position:fixed;z-index:42;bottom:2.2vh;inset-inline-end:1.4rem;
+  font-size:.74rem;color:rgba(255,246,228,.6);letter-spacing:.06em;
+  opacity:0;transition:opacity .5s var(--ease);pointer-events:none;
+}
+.skip-hint.in{opacity:1;animation:skipPulse 2.4s ease-in-out infinite}
+@keyframes skipPulse{0%,100%{opacity:.4}50%{opacity:.85}}
+
+/* during the cold open the game chrome gets out of the way */
+body.cinema #chrome,
+body.cinema #hud,
+body.cinema #touch{opacity:0;pointer-events:none;transition:opacity .4s var(--ease)}
+
+/* the speech bubble is centred and larger while the scene plays */
+body.cinema .dlg{bottom:15vh;max-width:min(90vw,640px)}
+body.cinema .dlg-text{font-size:clamp(1rem,2.8vw,1.22rem)}
+
 /* ───────── chrome ───────── */
 .chrome{position:fixed;top:.7rem;inset-inline-end:.7rem;z-index:40;display:flex;gap:.35rem;flex-direction:column}
 body.show-en .chrome{inset-inline-end:.7rem}
@@ -254,6 +323,7 @@ body.touch .touch{display:block}
 .tbtn:active{transform:translateY(3px);box-shadow:0 2px 0 var(--wood)}
 body.touch .shofar-ring{inset-inline-end:7.6rem;bottom:11.5rem}
 body.touch .manifest{bottom:.4rem;max-width:62vw}
+body.touch .minimap-wrap{left:auto;right:12px;top:4.2rem;bottom:auto;width:92px}
 
 /* ───────── verse card ───────── */
 .verse{

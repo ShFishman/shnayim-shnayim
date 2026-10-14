@@ -103,6 +103,17 @@
   <div class="prompt" id="prompt"><span id="prompt-text"></span></div>
 
   <div class="marker" id="marker"><svg viewBox="0 0 24 24"><path d="M2 12l18-8-6 8 6 8z"/></svg></div>
+
+  <!-- always-on guidance: points at what you need next -->
+  <div class="waypoint" id="waypoint">
+    <svg viewBox="0 0 24 24" class="wp-arrow"><path d="M12 2l9 18-9-5-9 5z"/></svg>
+    <span class="wp-dist" id="waypoint-dist"></span>
+  </div>
+
+  <!-- radar + flood map -->
+  <div class="minimap-wrap">
+    <canvas id="minimap" class="minimap"></canvas>
+  </div>
 </div>
 
 <!-- ───────── chrome ───────── -->
@@ -121,6 +132,11 @@
     <button id="btn-talk" class="tbtn small">דַּבֵּר</button>
   </div>
 </div>
+
+<!-- ───────── cold open ───────── -->
+<div class="bars" id="bars"><i class="bar top"></i><i class="bar bottom"></i></div>
+<div class="caption" id="caption"></div>
+<div class="skip-hint" id="skip-hint"></div>
 
 <!-- ───────── verse card ───────── -->
 <div id="verse" class="verse">

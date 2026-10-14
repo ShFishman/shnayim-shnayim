@@ -25,6 +25,8 @@ const { Crowd } = await import('./villagers.js');
 const { HUD } = await import('./hud.js');
 const { Grove } = await import('./flora.js');
 const { Audio } = await import('./audio.js');
+const { Minimap } = await import('./minimap.js');
+const { playOpening } = await import('./opening.js');
 
 /* ───────────────────────── timeline ─────────────────────────
  * Seconds from the first step. Water is a curve, not a line: almost nothing
@@ -125,6 +127,8 @@ engine.scene.add(noah.group);
 herd.setPlayer(noah);
 
 const hud = new HUD();
+const minimap = new Minimap(hud.el.minimap, terrain);
+addEventListener('resize', () => minimap.resize(), { passive: true });
 const audio = new Audio();
 const input = new Input(canvas);
 
@@ -162,7 +166,7 @@ const G = {
   skipIntro: QS.has('skip'),
   phase: -1,
   shofarCd: 0,
-  shofarMax: 1.15,
+  shofarMax: 0.7,
   believed: 0,
   paused: false,
   tipT: 8,
@@ -170,7 +174,7 @@ const G = {
   secretTeased: false,
 };
 
-const SHOFAR_RANGE = () => CALL_RADIUS + crowd.convincedCount * 2.2;
+const SHOFAR_RANGE = () => CALL_RADIUS + crowd.convincedCount * 2.6;
 
 /* ───────────────────────── input wiring ───────────────────────── */
 
@@ -215,24 +219,13 @@ gate.classList.add('in');
 document.getElementById('gate-begin').addEventListener('click', async () => {
   gate.classList.remove('in');
   await audio.start();
-  audio.setMusic(0.5, 0);
+  audio.setMusic(0.45, 0);
   engine.start();
-  await playIntro();
+  if (!G.skipIntro) {
+    await playOpening({ engine, hud, audio, sky, rain, ocean, terrain, ark, crowd, herd, noah });
+  }
   beginRun();
 }, { once: true });
-
-async function playIntro() {
-  hud.setHudVisible(false);
-  engine.rig.free();
-  engine.rig.snap([0, 9, 40], [0, 3, 10]);
-  engine.rig.moveTo([14, 7, 30], [0, 3, 2], 11, ease.inOutQuad);
-
-  for (const v of T.intro) {
-    if (G.skipIntro) break;
-    await hud.verse(v, (v.dwell ?? 4000) / 1000);
-  }
-  hud.hideVerse();
-}
 
 function beginRun() {
   G.started = true;
@@ -243,11 +236,9 @@ function beginRun() {
   hud.toast(T.tips[0], { dur: 5 });
 }
 
-// let a click skip the opening
-addEventListener('pointerdown', () => { if (!G.started) G.skipIntro = true; });
+// the cold open installs its own skip listeners; this is only for play
 addEventListener('keydown', e => {
   if (e.code === 'Escape' && G.started && !G.over) togglePause();
-  if (!G.started) G.skipIntro = true;
 });
 
 /* ───────────────────────── phases ───────────────────────── */
@@ -280,7 +271,21 @@ const tmpV = new THREE.Vector3();
 engine.onFrame((dt, elapsed) => {
   hud.update(dt);
 
-  if (!G.started || G.paused) { ocean.recentre(noah.pos.x, noah.pos.z); return; }
+  if (!G.started || G.paused) {
+    // During the cold open the game clock is stopped, but the world still has
+    // to breathe: animals walk, villagers gesture, the ark sits in weather.
+    ocean.recentre(noah.pos.x, noah.pos.z);
+    sky.recentre(engine.camera.position.x, engine.camera.position.z);
+    rain.update(engine.camera.position);
+    if (!G.paused) {
+      const c0 = { waterLevel: ocean.level, ark, player: noah };
+      herd.update(dt, c0);
+      crowd.update(dt, c0);
+      ark.update(dt, elapsed, ocean.level);
+      engine.trackShadow(noah.pos.x, noah.pos.z);
+    }
+    return;
+  }
 
   if (!G.over) G.t += dt;
 
@@ -327,8 +332,10 @@ engine.onFrame((dt, elapsed) => {
     const ax = input.axes();
     const yaw = engine.rig.yaw;
     // camera forward on the ground plane, and its right-hand perpendicular
+    // forward is where the camera looks; right = forward x up. Getting the
+    // sign of `right` wrong here is exactly how A and D end up swapped.
     const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
-    const rx = -Math.cos(yaw), rz = Math.sin(yaw);
+    const rx = Math.cos(yaw), rz = -Math.sin(yaw);
     const mx = fx * ax.y + rx * ax.x;
     const mz = fz * ax.y + rz * ax.x;
 
@@ -393,27 +400,8 @@ engine.onFrame((dt, elapsed) => {
   hud.setPairs(herd.pairsComplete, herd.totalPairs);
   hud.setWater(clamp((water - WATER_LOW) / (WATER_HIGH - WATER_LOW), 0, 1));
 
-  // ── nudge toward the nearest animal you still need ──
-  const nl = herd.nearestLoose(noah.pos.x, noah.pos.z);
-  if (nl && nl.dist > 16) {
-    tmpV.copy(nl.critter.object.position);
-    tmpV.y += 2.2;
-    tmpV.project(engine.camera);
-    const onScreen = tmpV.z < 1 && Math.abs(tmpV.x) < 0.92 && Math.abs(tmpV.y) < 0.92;
-    if (!onScreen) {
-      const ang = Math.atan2(tmpV.y, tmpV.x);
-      const m = 0.84;
-      let sx = tmpV.x, sy = tmpV.y;
-      if (tmpV.z > 1) { sx = -sx; sy = -sy; }
-      const k = m / Math.max(Math.abs(sx), Math.abs(sy), 1e-4);
-      sx *= k; sy *= k;
-      hud.setMarker({
-        x: (sx * 0.5 + 0.5) * innerWidth,
-        y: (-sy * 0.5 + 0.5) * innerHeight,
-        angle: -Math.atan2(sy, sx),
-      }, true, nl.dist);
-    } else hud.setMarker(null, false);
-  } else hud.setMarker(null, false);
+  // ── always-on guidance: carry animals to the ark, else go find one ──
+  updateWaypoint();
 
   // ── rolling tips ──
   G.tipT -= dt;
@@ -421,6 +409,20 @@ engine.onFrame((dt, elapsed) => {
     G.tipT = 26;
     G.tipI = (G.tipI + 1) % T.tips.length;
     if (G.tipI > 0) hud.toast(T.tips[G.tipI], { dur: 5 });
+  }
+
+  // ── minimap, and a ring highlight on anything within shofar reach ──
+  const range = SHOFAR_RANGE();
+  minimap.draw({ noah, herd, crowd, ark, waterLevel: water, shofarRange: range });
+  const r2 = range * range;
+  for (const c of herd.critters) {
+    if (!c.ring.visible) continue;
+    const dx = c.pos.x - noah.pos.x, dz = c.pos.z - noah.pos.z;
+    const near = (dx * dx + dz * dz) < r2 && herd.line.length < HERD_LIMIT;
+    const m = c.ring.material;
+    m.opacity = near ? 0.6 + Math.sin(elapsed * 6) * 0.3 : 0.5;
+    const s = near ? 1.25 + Math.sin(elapsed * 6) * 0.12 : 1;
+    c.ring.scale.setScalar(s);
   }
 
   // ── follow bits ──
@@ -479,6 +481,54 @@ async function finish() {
     secret: uniAboard,
     timeLeft: 0,
   });
+}
+
+/* ───────────────────────── waypoint ─────────────────────────
+ * One arrow that always answers "where now?". With animals in tow it points
+ * at the ramp; otherwise at the nearest pair member you still owe. On screen
+ * it sits over the target; off screen it pins to the edge and points.
+ */
+function updateWaypoint() {
+  if (G.over) { hud.setWaypoint(null); return; }
+
+  let wx, wz, wy, kind;
+  if (herd.line.length > 0) {
+    wx = ark.boardX; wz = ark.boardZ; wy = 3.2; kind = 'ark';
+  } else {
+    const nl = herd.nearestLoose(noah.pos.x, noah.pos.z);
+    if (!nl) { hud.setWaypoint(null); return; }
+    wx = nl.critter.pos.x; wz = nl.critter.pos.z;
+    wy = nl.critter.object.position.y + 2.4; kind = 'animal';
+  }
+  const dist = Math.hypot(wx - noah.pos.x, wz - noah.pos.z);
+  if (kind === 'animal' && dist < 7) { hud.setWaypoint(null); return; }
+
+  tmpV.set(wx, kind === 'ark' ? ark.group.position.y + wy : wy, wz);
+  tmpV.project(engine.camera);
+
+  const behind = tmpV.z > 1;
+  let x = tmpV.x, y = tmpV.y;
+  if (behind) { x = -x; y = -y; }
+
+  const onScreen = !behind && Math.abs(x) < 0.9 && Math.abs(y) < 0.86;
+  if (onScreen) {
+    hud.setWaypoint({
+      x: (x * 0.5 + 0.5) * innerWidth,
+      y: (-y * 0.5 + 0.5) * innerHeight,
+      edge: false,
+    }, kind, dist);
+  } else {
+    // push out to the frame edge along the same direction
+    const k = 0.84 / Math.max(Math.abs(x), Math.abs(y), 1e-4);
+    const ex = x * k, ey = y * k;
+    hud.setWaypoint({
+      x: (ex * 0.5 + 0.5) * innerWidth,
+      y: (-ey * 0.5 + 0.5) * innerHeight,
+      // svg arrow points up at rot 0, so rotate from +Y
+      angle: Math.atan2(ex, ey),
+      edge: true,
+    }, kind, dist);
+  }
 }
 
 /* ───────────────────────── the dove ─────────────────────────
