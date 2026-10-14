@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>playtest</title>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}
+</script></head><body>
+<script type="module">
+// Headless integration test of the core loop: no renderer, no input. A scripted
+// Noah walks to the nearest animal it still needs, blows the shofar, walks to
+// the ramp, and repeats. If the manifest fills, the game is winnable.
+import * as THREE from 'three';
+import { initShaders } from './src/materials.js';
+await initShaders();
+const { Terrain } = await import('./src/world.js');
+const { Ark } = await import('./src/ark.js');
+const { Herd, HERD_LIMIT, CALL_RADIUS } = await import('./src/animals.js');
+const { Noah } = await import('./src/player.js');
+const { Crowd } = await import('./src/villagers.js');
+
+const out = [];
+const log = m => { out.push(m); console.log(m); };
+
+try {
+  const scene = new THREE.Scene();
+  const terrain = new Terrain({ seed: 1771 });
+  const ark = new Ark({ terrain });
+  scene.add(ark.group);
+  const herd = new Herd({ terrain, ark, scene, seed: 909 });
+  const crowd = new Crowd({ terrain, scene, seed: 404, count: 7 });
+  const noah = new Noah();
+  noah.pos.set(5, terrain.heightAt(5, 22), 22);
+  scene.add(noah.group);
+  herd.setPlayer(noah);
+
+  log('spawned critters=' + herd.critters.length + ' species=' + herd.totalPairs);
+
+  const DT = 1 / 30;
+  const RUN = 390;
+  const WATER_LOW = -12, WATER_HIGH = 12;
+  const waterAt = t => WATER_LOW + (WATER_HIGH - WATER_LOW) * Math.pow(Math.min(t / RUN, 1), 1.8);
+
+  let t = 0, cd = 0, blown = 0, boardTrips = 0;
+  let target = null;   // {x,z} the bot is walking to
+  let mode = 'hunt';
+
+  while (t < RUN) {
+    t += DT;
+    const water = waterAt(t);
+    cd = Math.max(0, cd - DT);
+
+    // ---- bot brain ----
+    if (mode === 'hunt') {
+      const nl = herd.nearestLoose(noah.pos.x, noah.pos.z);
+      if (!nl) { mode = 'deliver'; }
+      else {
+        target = { x: nl.critter.pos.x, z: nl.critter.pos.z };
+        const d = Math.hypot(target.x - noah.pos.x, target.z - noah.pos.z);
+        if (d < CALL_RADIUS * 0.75 && cd <= 0) {
+          const n = herd.call(noah.pos.x, noah.pos.z, CALL_RADIUS);
+          cd = 1.2; blown++;
+          if (herd.line.length >= HERD_LIMIT || n === 0) mode = 'deliver';
+        }
+      }
+    }
+    if (mode === 'deliver') {
+      target = { x: ark.boardX, z: ark.boardZ };
+      const d = Math.hypot(target.x - noah.pos.x, target.z - noah.pos.z);
+      if (d < 3.0) { boardTrips++; mode = 'hunt'; }
+      if (herd.line.length === 0 && d < 12) mode = 'hunt';
+    }
+
+    // ---- drive the player toward the target ----
+    let mx = 0, mz = 0;
+    if (target) {
+      const dx = target.x - noah.pos.x, dz = target.z - noah.pos.z;
+      const d = Math.hypot(dx, dz) || 1;
+      mx = dx / d; mz = dz / d;
+    }
+    noah.update(DT, { x: mx, z: mz, run: true }, terrain, { waterLevel: water });
+
+    const ctx = { waterLevel: water, ark, player: noah };
+    herd.update(DT, ctx);
+    crowd.update(DT, ctx);
+    ark.allowFloat = t > RUN - 45;
+    ark.update(DT, t, water);
+    herd.drainEvents();
+  }
+
+  const pairs = herd.pairsComplete;
+  log('RESULT pairs=' + pairs + '/' + herd.totalPairs +
+      ' animals=' + herd.aboardCount +
+      ' shofarBlasts=' + blown + ' deliveries=' + boardTrips);
+  log('manifest ' + [...herd.manifest].map(([k, v]) => k + (v.m ? 'M' : '-') + (v.f ? 'F' : '-')).join(' '));
+  log('finalWater=' + waterAt(RUN).toFixed(1) + ' noahY=' + noah.pos.y.toFixed(2));
+  log(pairs >= herd.totalPairs ? 'VERDICT winnable' : (pairs > 0 ? 'VERDICT partial' : 'VERDICT BROKEN'));
+} catch (e) {
+  log('THREW ' + e.message + '\n' + e.stack);
+}
+log('PLAYTEST DONE');
+document.title = 'done';
+</script></body></html>

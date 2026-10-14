@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>שניים שניים — פרשת נח</title>
+<meta name="description" content="משחק תלת־ממד על פרשת נח: אסוף זוג מכל מין לתיבה לפני שהמבול מכסה הכול. A 3D game about Noah's ark, the flood, and a world that would not listen.">
+<meta name="theme-color" content="#7cc0e4">
+
+<meta property="og:title" content="שניים שניים — Two by Two">
+<meta property="og:description" content="ארבעים יום, ארבעים לילה, ואפס מתנדבים. Forty days, forty nights, and zero volunteers.">
+<meta property="og:type" content="website">
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%237cc0e4'/%3E%3Cpath d='M8 38h48l-8 14H16z' fill='%238b5a2b'/%3E%3Crect x='20' y='20' width='24' height='18' fill='%23a9713a'/%3E%3Cpath d='M18 20h28l-14-10z' fill='%236d4420'/%3E%3C/svg%3E">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700;900&family=Secular+One&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./styles.css">
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+
+<canvas id="stage"></canvas>
+
+<!-- ───────── boot ───────── -->
+<div id="boot" class="boot">
+  <div class="boot-ark">
+    <svg viewBox="0 0 120 80" aria-hidden="true">
+      <path d="M6 44h108l-18 30H24z" fill="#8b5a2b"/>
+      <rect x="34" y="16" width="52" height="28" fill="#a9713a"/>
+      <path d="M30 16h60l-30-14z" fill="#6d4420"/>
+      <circle cx="60" cy="30" r="5" fill="#2b1a0c"/>
+    </svg>
+  </div>
+  <div class="boot-bar"><i></i></div>
+  <div class="boot-note" id="boot-note">טוען…</div>
+</div>
+
+<!-- ───────── title gate ───────── -->
+<div id="gate" class="gate">
+  <div class="gate-inner">
+    <h1 class="gate-he">שְׁנַיִם שְׁנַיִם</h1>
+    <div class="gate-en">Two by Two</div>
+    <div class="gate-sub">אַרְבָּעִים יוֹם, אַרְבָּעִים לַיְלָה, וְאֶפֶס מִתְנַדְּבִים</div>
+    <p class="gate-blurb">
+      אַתָּה נֹחַ. יֵשׁ לְךָ תֵּבָה, רַמְפָּה, וְשׁוֹפָר.<br>
+      הָעוֹלָם חוֹשֵׁב שֶׁאַתָּה מַצְחִיק. הַגֶּשֶׁם כְּבָר בַּדֶּרֶךְ.
+      <span class="en-only">You are Noah. You have an ark, a ramp, and a shofar.<br>
+      The world thinks you are hilarious. The rain is already on its way.</span>
+    </p>
+
+    <div class="gate-keys">
+      <div><b>WASD</b> <span>ללכת</span></div>
+      <div><b>Shift</b> <span>לרוץ</span></div>
+      <div><b>רווח</b> <span>שופר — החיות יילכו אחריך</span></div>
+      <div><b>E</b> <span>לדבר עם אנשים</span></div>
+      <div><b>גרירה</b> <span>לסובב מצלמה</span></div>
+    </div>
+
+    <button id="gate-begin" class="begin">הַתְחֵל</button>
+    <div class="gate-fine">אוזניות מומלצות · Headphones recommended</div>
+  </div>
+</div>
+
+<!-- ───────── HUD ───────── -->
+<div id="hud" class="hud">
+
+  <div class="hud-top">
+    <div class="pairs-box">
+      <div class="pairs-n" id="hud-pairs">0/8</div>
+      <div class="pairs-l" id="hud-pairs-label"></div>
+    </div>
+    <div class="phase" id="phase"></div>
+    <div class="water-box">
+      <div class="water-l" id="water-label"></div>
+      <div class="water-tube"><i id="water-fill"></i></div>
+    </div>
+  </div>
+
+  <div class="manifest" id="manifest"></div>
+
+  <div class="shofar-ring" id="shofar-ring">
+    <svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="20"/><circle cx="24" cy="24" r="20" class="fill"/></svg>
+    <span>␣</span>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <div class="dlg" id="dialog">
+    <div class="dlg-name" id="dlg-name"></div>
+    <div class="dlg-text" id="dlg-text"></div>
+  </div>
+
+  <div class="prompt" id="prompt"><span id="prompt-text"></span></div>
+
+  <div class="marker" id="marker"><svg viewBox="0 0 24 24"><path d="M2 12l18-8-6 8 6 8z"/></svg></div>
+</div>
+
+<!-- ───────── chrome ───────── -->
+<div id="chrome" class="chrome">
+  <button id="btn-sound" class="cbtn" title="צליל" aria-label="sound">♪</button>
+  <button id="btn-lang"  class="cbtn" title="language" aria-label="language">EN</button>
+  <button id="btn-help"  class="cbtn" title="עזרה" aria-label="help">?</button>
+  <button id="btn-full"  class="cbtn" title="מסך מלא" aria-label="fullscreen">⤢</button>
+</div>
+
+<!-- ───────── touch ───────── -->
+<div id="touch" class="touch">
+  <div id="stick" class="stick"><i id="stick-knob"></i></div>
+  <div class="touch-btns">
+    <button id="btn-shofar" class="tbtn">שׁוֹפָר</button>
+    <button id="btn-talk" class="tbtn small">דַּבֵּר</button>
+  </div>
+</div>
+
+<!-- ───────── verse card ───────── -->
+<div id="verse" class="verse">
+  <div class="verse-ref" id="verse-ref"></div>
+  <div class="verse-he" id="verse-he"></div>
+  <div class="verse-en" id="verse-en"></div>
+</div>
+
+<!-- ───────── pause ───────── -->
+<div id="pause" class="modal">
+  <div class="modal-in">
+    <h2>הֻפְסַק</h2>
+    <div class="keys">
+      <div><b>WASD / ←↑↓→</b><span>ללכת</span></div>
+      <div><b>Shift</b><span>לרוץ</span></div>
+      <div><b>רווח</b><span>לתקוע בשופר — חיות בסביבה ילכו אחריך</span></div>
+      <div><b>E</b><span>לדבר עם אנשים (זה לא יעזור. תנסה בכל זאת)</span></div>
+      <div><b>גרירה / גלגלת</b><span>מצלמה</span></div>
+    </div>
+    <p class="goal">הַכְנֵס זוּג מִכָּל מִין לַתֵּבָה לִפְנֵי שֶׁהַמַּיִם יְכַסּוּ אֶת הַכֹּל.<br>זָכָר וּנְקֵבָה — שְׁנַיִם שְׁנַיִם.</p>
+    <button id="pause-resume" class="begin">חֲזֹר לַמִּשְׂחָק</button>
+  </div>
+</div>
+
+<!-- ───────── ending ───────── -->
+<div id="ending" class="modal">
+  <div class="modal-in">
+    <div class="end-rainbow">
+      <svg viewBox="0 0 200 100" aria-hidden="true">
+        <g fill="none" stroke-width="9" stroke-linecap="round">
+          <path d="M14 96a86 86 0 0 1 172 0" stroke="#e4572e"/>
+          <path d="M26 96a74 74 0 0 1 148 0" stroke="#f3a712"/>
+          <path d="M38 96a62 62 0 0 1 124 0" stroke="#f7e733"/>
+          <path d="M50 96a50 50 0 0 1 100 0" stroke="#5bb85b"/>
+          <path d="M62 96a38 38 0 0 1 76 0" stroke="#4a90d9"/>
+          <path d="M74 96a26 26 0 0 1 52 0" stroke="#8e6bbf"/>
+        </g>
+      </svg>
+    </div>
+    <h2 id="end-title"></h2>
+    <p id="end-body"></p>
+    <div class="stats" id="end-stats"></div>
+    <button id="end-again" class="begin">עוֹד פַּעַם</button>
+  </div>
+</div>
+
+<noscript><div class="noscript">המשחק דורש JavaScript · This game requires JavaScript</div></noscript>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
